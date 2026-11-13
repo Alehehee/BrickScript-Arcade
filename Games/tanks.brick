@@ -1,0 +1,173 @@
+#tanks.brick - Juego de supervivencia de Tanques
+GAME_TYPE TANKS
+
+GAME GRID (30, 30)
+
+# ELEMENTOS DEL JUGADOR
+    DEFINE SHAPE PLAYER_TANK
+    TYPE: PLAYER
+    COLOR: #00FF00
+    HP: 3
+    STATE 1:
+    [0, 1, 0]
+    [1, 1, 1]
+    [1, 1, 1]
+
+    
+    STATE 2:
+    [1, 1, 0]
+    [1, 1, 1]
+    [1, 1, 0]
+
+    
+    STATE 3:
+    [1, 1, 1]
+    [1, 1, 1]
+    [0, 1, 0]
+
+    
+    STATE 4:
+    [0, 1, 1]
+    [1, 1, 1]
+    [0, 1, 1]    
+END SHAPE
+
+# ELEMENTOS DEL PROYECTIL (Bala)
+    DEFINE SHAPE BULLET
+    TYPE: PROJECTILE
+    COLOR: #FFFF00
+    BEHAVIOR: MOVE_UP
+    [1]
+    [1]
+END SHAPE
+
+# LOS ENEMIGOS (Con puntaje por matarlos)
+    DEFINE SHAPE ENEMY_NORMAL
+    TYPE: ENEMY
+    COLOR: #FF0000
+    HP: 2
+    BEHAVIOR: WANDER # Significa que se mueve al azar por el mapa
+    SPEED: 150
+    POINTS: 10
+    CHANCE: 0.5
+    STATE 1:
+    [0, 1, 0]
+    [1, 1, 1]
+    [1, 1, 1]
+
+    
+    STATE 2:
+    [1, 1, 0]
+    [1, 1, 1]
+    [1, 1, 0]
+
+    
+    STATE 3:
+    [1, 1, 1]
+    [1, 1, 1]
+    [0, 1, 0]
+
+    
+    STATE 4:
+    [0, 1, 1]
+    [1, 1, 1]
+    [0, 1, 1]    
+END SHAPE
+
+DEFINE SHAPE ENEMY_FAST
+    TYPE: ENEMY
+    COLOR: #FFA500
+    HP: 2
+    SPEED: 100
+    POINTS: 20
+    CHANCE: 0.3
+    STATE 1:
+    [0, 1, 0]
+    [1, 1, 1]
+    [1, 0, 1]
+
+    
+    STATE 2:
+    [1, 1, 0]
+    [0, 1, 1]
+    [1, 1, 0]
+
+    
+    STATE 3:
+    [1, 0, 1]
+    [1, 1, 1]
+    [0, 1, 0]
+
+    
+    STATE 4:
+    [0, 1, 1]
+    [1, 1, 0]
+    [0, 1, 1]    
+END SHAPE
+
+DEFINE SHAPE ENEMY_ARMORED
+    TYPE: ENEMY
+    COLOR: #808080
+    HP: 3
+    SPEED: 190
+    POINTS: 50
+    CHANCE: 0.2
+    STATE 1:
+    [0, 1, 0]
+    [1, 1, 1]
+    [1, 1, 1]
+
+    
+    STATE 2:
+    [1, 1, 0]
+    [1, 1, 1]
+    [1, 1, 0]
+
+    
+    STATE 3:
+    [1, 1, 1]
+    [1, 1, 1]
+    [0, 1, 0]
+
+    
+    STATE 4:
+    [0, 1, 1]
+    [1, 1, 1]
+    [0, 1, 1]    
+END SHAPE
+
+# POWER-UPS
+    DEFINE POWERUP MARTILLO
+    TYPE: HEAL
+    COLOR: #00FFFF
+    VALUE: 1
+    CHANCE: 0.03
+    [1, 1, 1]
+    [0, 1, 0]
+    [0, 1, 0]
+END POWERUP
+
+DEFINE POWERUP ESCUDO #Manzana Invencibilidad
+    TYPE: INVINCIBLE
+    COLOR: #0000FF
+    VALUE: 500
+    CHANCE: 0.03
+    [1]
+END POWERUP
+
+# FINAL BOSS
+    DEFINE SHAPE FINAL_BOSS
+    TYPE: BOSS
+    COLOR: #800080
+    HP: 20
+    POINTS: 500
+    [1, 1, 1, 1, 1]
+    [1, 1, 1, 1, 1]
+    [1, 0, 1, 0, 1]
+END SHAPE
+
+# REGLAS DE TRANSICIÓN
+EVENTS
+ON TARGET_SCORE 1000 EXECUTE CLEAR_ENEMIES
+ON TARGET_SCORE 1000 SPAWN FINAL_BOSS
+END EVENTS

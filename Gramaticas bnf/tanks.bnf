@@ -1,0 +1,56 @@
+ ::= <game_type_decl> <game_grid_decl> 
+
+<game_type_decl> ::= "GAME_TYPE" "TANKS"
+<game_grid_decl> ::= "GAME" "GRID" "("  ","  ")"
+
+ ::=  |  
+ ::= <shape_def> | <powerup_def> | <events_def>
+
+<shape_def> ::= "DEFINE" "SHAPE"  <shape_attributes> <shape_body> "END" "SHAPE"
+
+<shape_attributes> ::= <shape_attr> | <shape_attr> <shape_attributes>
+<shape_attr> ::= <type_attr>
+| <color_attr>
+| <hp_attr>
+| <behavior_attr>
+| <speed_attr>
+| <points_attr>
+| <chance_attr>
+
+<type_attr> ::= "TYPE" [":"] ("PLAYER" | "PROJECTILE" | "ENEMY" | "BOSS")
+<color_attr> ::= "COLOR" [":"] <hex_color>
+<hp_attr> ::= "HP" [":"] 
+<behavior_attr> ::= "BEHAVIOR" [":"] 
+<speed_attr> ::= "SPEED" [":"] 
+<points_attr> ::= "POINTS" [":"] 
+<chance_attr> ::= "CHANCE" [":"] 
+
+<shape_body> ::= <state_list> | 
+<state_list> ::= <state_def> | <state_def> <state_list>
+<state_def> ::= "STATE"  ":" 
+
+<powerup_def> ::= "DEFINE" "POWERUP"  <powerup_attributes>  "END" "POWERUP"
+
+<powerup_attributes> ::= <powerup_attr> | <powerup_attr> <powerup_attributes>
+<powerup_attr> ::= <type_pu_attr>
+| <color_attr>
+| <value_attr>
+| <chance_attr>
+
+<type_pu_attr> ::= "TYPE" [":"] ("HEAL" | "INVINCIBLE")
+<value_attr> ::= "VALUE" [":"] 
+
+<events_def> ::= "EVENTS" <event_list> "END" "EVENTS"
+<event_list> ::= <event_rule> | <event_rule> <event_list>
+<event_rule> ::= "ON" "TARGET_SCORE"  
+ ::= "EXECUTE"  | "SPAWN" 
+
+ ::=  |  
+ ::= "[" <binary_list> "]"
+<binary_list> ::=  |  "," <binary_list>
+ ::= "0" | "1"
+
+ ::= [A-Za-z_][A-Za-z0-9_]*
+ ::= [0-9]+
+ ::= [0-9]+ "." [0-9]+
+<hex_color> ::= "#" [0-9A-Fa-f]{6}

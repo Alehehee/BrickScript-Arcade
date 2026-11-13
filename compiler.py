@@ -138,12 +138,30 @@ class Parser:
 
     # --- DEFINE SHAPE / POWERUP ------------------------------------
     def parsear_estados(self):
-        # STATE 1: [..] [..]  STATE 2: ...  ->  lista de matrices
         estados = []
+        
+        # CASO 1: Matriz directa sin la palabra "STATE" (Ej: BULLET, FINAL_BOSS)
+        if self.actual() == '[':
+            matriz = []
+            while self.actual() == '[':
+                fila = []
+                self.consumir('[')
+                while self.actual() != ']':
+                    fila.append(int(self.consumir()))
+                    if self.actual() == ',':
+                        self.consumir(',')
+                self.consumir(']')
+                matriz.append(fila)
+            estados.append(matriz)
+            return estados
+
+        # CASO 2: Múltiples estados (STATE 1:, STATE 2:, etc.) para los Tanques
         while self.actual() == 'STATE':
             self.consumir('STATE')
-            self.consumir()                 # numero del estado (no se guarda)
-            self.consumir(':')
+            self.consumir() # Consume el número (1, 2, 3...)
+            if self.actual() == ':': # Dos puntos opcionales
+                self.consumir(':')
+                
             matriz = []
             while self.actual() == '[':
                 fila = []
@@ -156,7 +174,7 @@ class Parser:
                 matriz.append(fila)
             estados.append(matriz)
         return estados
-
+    
     def parsear_definicion(self):
         self.consumir('DEFINE')
         tipo = self.consumir()
@@ -170,42 +188,77 @@ class Parser:
 
     def parsear_shape(self):
         nombre = self.consumir()
-        self.consumir(':')
-        # 'attrs' lleva TODOS los atributos con valores por defecto (para Tetris).
-        # 'explicitos' solo lo que el programador escribio (para Snake).
+        
+        if self.actual() == ':': # Por si acaso alguien pone DEFINE SHAPE NOMBRE:
+            self.consumir(':')
+            
         attrs = {"color": "#00FFFF", "chance": 1}
         explicitos = {}
-        # <-- NUEVO: 'FORM' se agrega a la lista de atributos aceptados.
-        while self.actual() in ('COLOR', 'CHANCE', 'FORM'):
+        
+        # LISTA ACTUALIZADA CON LOS NUEVOS ATRIBUTOS DE LOS TANQUES
+        palabras_clave = ('COLOR', 'CHANCE', 'FORM', 'TYPE', 'HP', 'BEHAVIOR', 'SPEED', 'POINTS')
+        
+        while self.actual() in palabras_clave:
             clave = self.consumir()
-            self.consumir(':')
+            
+            # Hacemos los dos puntos opcionales
+            if self.actual() == ':':
+                self.consumir(':')
+                
             valor = self.consumir()
+            
+            # Guardamos los valores según el tipo de dato que sean
             if clave == 'COLOR':
                 attrs['color'] = explicitos['color'] = self.normalizar_color(valor)
             elif clave == 'CHANCE':
-                attrs['chance'] = explicitos['chance'] = int(valor)
-            else:                                   # FORM
+                attrs['chance'] = explicitos['chance'] = float(valor) # Ahora admite decimales (0.5)
+            elif clave == 'HP':
+                attrs['hp'] = explicitos['hp'] = int(valor)
+            elif clave == 'SPEED':
+                attrs['speed'] = explicitos['speed'] = int(valor)
+            elif clave == 'POINTS':
+                attrs['points'] = explicitos['points'] = int(valor)
+            elif clave == 'TYPE':
+                attrs['type'] = explicitos['type'] = valor
+            elif clave == 'BEHAVIOR':
+                attrs['behavior'] = explicitos['behavior'] = valor
+            elif clave == 'FORM':
                 if valor not in FORMAS_VALIDAS:
-                    raise Exception("Error de sintaxis: FORM debe ser RECTANGULAR, "
-                                    "CIRCULAR o TRIANGULAR, se encontro '" + str(valor) + "'")
+                    raise Exception("Error de sintaxis: FORM inválido.")
                 attrs['form'] = explicitos['form'] = valor
+
         estados = self.parsear_estados()
         self.consumir('END')
+        
+        if self.actual() == 'SHAPE': # Consumir SHAPE si el archivo dice "END SHAPE"
+            self.consumir('SHAPE')
+            
         self.ast['shapes'][nombre] = estados
+        
         if self.ast['tipo_juego'] == 'TETRIS':
             self.ast['shape_attrs'][nombre] = attrs
         elif explicitos:
-            # Snake: solo se guarda lo escrito. Si no escribiste nada, no sale
-            # 'shape_attrs' (asi el snake.json viejo queda identico).
             self.ast['shape_attrs'][nombre] = explicitos
 
     def parsear_powerup(self):
         nombre = self.consumir()
-        self.consumir(':')
-        pu = {"puntos": 0, "color": "#FFFFFF"}
-        while self.actual() in ('COLOR', 'EFFECT', 'POINTS', 'TRIGGER_LINES', 'TRIGGER_ROTATE'):
-            clave = self.consumir()
+
+        # Dos puntos opcionales después del nombre
+        if self.actual() == ':':
             self.consumir(':')
+
+        pu = {"puntos": 0, "color": "#FFFFFF"}
+
+        # Agregamos TYPE, VALUE y CHANCE a las palabras permitidas
+        palabras_clave = ('COLOR', 'EFFECT', 'POINTS', 'TRIGGER_LINES', 'TRIGGER_ROTATE', 'TYPE', 'VALUE', 'CHANCE')
+
+        while self.actual() in palabras_clave:
+            clave = self.consumir()
+
+            # Dos puntos opcionales después de la palabra clave
+            if self.actual() == ':':
+                self.consumir(':')
+
             if clave == 'COLOR':
                 pu['color'] = self.normalizar_color(self.consumir())
             elif clave == 'EFFECT':
@@ -218,8 +271,21 @@ class Parser:
                 shape = self.consumir()
                 veces = int(self.consumir())
                 pu['trigger_rotacion'] = {"shape": shape, "veces": veces}
+            # --- NUEVOS ATRIBUTOS PARA TANKS ---
+            elif clave == 'TYPE':
+                pu['type'] = self.consumir()
+            elif clave == 'VALUE':
+                pu['value'] = int(self.consumir())
+            elif clave == 'CHANCE':
+                pu['chance'] = float(self.consumir())
+
         pu['estados'] = self.parsear_estados()
+
+        # Consumir POWERUP si el archivo dice "END POWERUP" en lugar de solo "END"
         self.consumir('END')
+        if self.actual() == 'POWERUP':
+            self.consumir('POWERUP')
+
         self.ast['powerups'][nombre] = pu
 
     # --- LEVELS (NUEVO, Actividad 4) -------------------------------

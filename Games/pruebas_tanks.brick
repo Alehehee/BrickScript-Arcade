@@ -1,0 +1,62 @@
+# tanks.brick - Juego de Tanques: Jugadores y Enemigos
+GAME_TYPE TANKS 
+
+GAME_GRID (25, 25)
+
+#---Definicion de elementos TANK_PLAYER---
+DEFINE SHAPE PLAYER_TANK:
+    TYPE: PLAYER
+    COLOR: #215c21
+    HP 3
+    STATE 1:
+    [0, 1, 0]
+    [1, 1, 1]
+    [1, 1, 1]
+
+    
+    STATE 2:
+    [1, 1, 0]
+    [1, 1, 1]
+    [1, 1, 0]
+
+    
+    STATE 3:
+    [1, 1, 1]
+    [1, 1, 1]
+    [0, 1, 0]
+
+    
+    STATE 4:
+    [0, 1, 1]
+    [1, 1, 1]
+    [0, 1, 1]    
+END    
+
+#---Definicion de elementos TANK_ENEMIES---
+DEFINE SHAPE SOFT_ENEMY_TANK:
+    TYPE: FAST_ENEMY
+    COLOR: #215c21
+    HP 1
+    STATE 1:
+    [0, 1, 0]
+    [1, 1, 1]
+    [1, 1, 1]
+
+    
+    STATE 2:
+    [1, 1, 0]
+    [1, 1, 1]
+    [1, 1, 0]
+
+    
+    STATE 3:
+    [1, 1, 1]
+    [1, 1, 1]
+    [0, 1, 0]
+
+    
+    STATE 4:
+    [0, 1, 1]
+    [1, 1, 1]
+    [0, 1, 1]    
+END    
