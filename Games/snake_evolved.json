@@ -1,26 +1,11 @@
 {
-  "levels": [
-    {
-      "nombre": "BABY", 
-      "next_at": 50, 
-      "speed": 150
-    }, 
-    {
-      "nombre": "ENTUSIASTA", 
-      "next_at": 150, 
-      "speed": 100, 
-      "poison": 10, 
-      "invulnerable": 5
-    }, 
-    {
-      "nyan": 1, 
-      "clouds": 6, 
-      "invulnerable": 5, 
-      "poison": 10, 
-      "nombre": "NYAN_CAT", 
-      "speed": 75
-    }
-  ], 
+  "tipo_juego": "SNAKE",
+  "config": {
+    "grid_size": [
+      18,
+      18
+    ]
+  },
   "shapes": {
     "PIXEL": [
       [
@@ -29,111 +14,126 @@
         ]
       ]
     ]
-  }, 
-  "tipo_juego": "SNAKE", 
-  "shape_attrs": {
-    "PIXEL": {
-      "color": "#33CC33", 
-      "form": "CIRCULAR"
-    }
-  }, 
-  "config": {
-    "grid_size": [
-      18, 
-      18
-    ]
-  }, 
+  },
   "events": {
-    "ON_KEY_DOWN": [
-      {
-        "params": [], 
-        "accion": "SET_DIRECTION", 
-        "objeto": "DOWN"
-      }
-    ], 
-    "ON_EAT_FOOD": [
-      {
-        "params": [], 
-        "accion": "INCREASE_SCORE", 
-        "objeto": "10"
-      }, 
-      {
-        "params": [
-          "1"
-        ], 
-        "accion": "GROW", 
-        "objeto": "PLAYER"
-      }, 
-      {
-        "params": [
-          "RANDOM"
-        ], 
-        "accion": "SPAWN", 
-        "objeto": "FOOD"
-      }
-    ], 
-    "ON_KEY_RIGHT": [
-      {
-        "params": [], 
-        "accion": "SET_DIRECTION", 
-        "objeto": "RIGHT"
-      }
-    ], 
-    "ON_TICK": [
-      {
-        "params": [
-          "FORWARD"
-        ], 
-        "accion": "MOVE", 
-        "objeto": "PLAYER"
-      }
-    ], 
-    "ON_COLLISION_WALL": [
-      {
-        "params": [], 
-        "accion": "GAME_OVER", 
-        "objeto": null
-      }
-    ], 
-    "ON_COLLISION_SELF": [
-      {
-        "params": [], 
-        "accion": "GAME_OVER", 
-        "objeto": null
-      }
-    ], 
     "ON_START": [
       {
+        "accion": "SPAWN",
+        "objeto": "PLAYER",
         "params": [
           [
-            9, 
+            9,
             9
           ]
-        ], 
-        "accion": "SPAWN", 
-        "objeto": "PLAYER"
-      }, 
+        ]
+      },
       {
+        "accion": "SPAWN",
+        "objeto": "FOOD",
         "params": [
           "RANDOM"
-        ], 
-        "accion": "SPAWN", 
-        "objeto": "FOOD"
+        ]
       }
-    ], 
+    ],
+    "ON_TICK": [
+      {
+        "accion": "MOVE",
+        "objeto": "PLAYER",
+        "params": [
+          "FORWARD"
+        ]
+      }
+    ],
+    "ON_EAT_FOOD": [
+      {
+        "accion": "INCREASE_SCORE",
+        "objeto": "10",
+        "params": []
+      },
+      {
+        "accion": "GROW",
+        "objeto": "PLAYER",
+        "params": [
+          "1"
+        ]
+      },
+      {
+        "accion": "SPAWN",
+        "objeto": "FOOD",
+        "params": [
+          "RANDOM"
+        ]
+      }
+    ],
+    "ON_COLLISION_WALL": [
+      {
+        "accion": "GAME_OVER",
+        "objeto": null,
+        "params": []
+      }
+    ],
+    "ON_COLLISION_SELF": [
+      {
+        "accion": "GAME_OVER",
+        "objeto": null,
+        "params": []
+      }
+    ],
     "ON_KEY_UP": [
       {
-        "params": [], 
-        "accion": "SET_DIRECTION", 
-        "objeto": "UP"
+        "accion": "SET_DIRECTION",
+        "objeto": "UP",
+        "params": []
       }
-    ], 
+    ],
+    "ON_KEY_DOWN": [
+      {
+        "accion": "SET_DIRECTION",
+        "objeto": "DOWN",
+        "params": []
+      }
+    ],
     "ON_KEY_LEFT": [
       {
-        "params": [], 
-        "accion": "SET_DIRECTION", 
-        "objeto": "LEFT"
+        "accion": "SET_DIRECTION",
+        "objeto": "LEFT",
+        "params": []
+      }
+    ],
+    "ON_KEY_RIGHT": [
+      {
+        "accion": "SET_DIRECTION",
+        "objeto": "RIGHT",
+        "params": []
       }
     ]
-  }
+  },
+  "shape_attrs": {
+    "PIXEL": {
+      "form": "CIRCULAR",
+      "color": "#33CC33"
+    }
+  },
+  "levels": [
+    {
+      "nombre": "BABY",
+      "speed": 150,
+      "next_at": 50
+    },
+    {
+      "nombre": "ENTUSIASTA",
+      "speed": 100,
+      "next_at": 150,
+      "poison": 10,
+      "invulnerable": 5
+    },
+    {
+      "nombre": "NYAN_CAT",
+      "speed": 75,
+      "poison": 10,
+      "invulnerable": 5,
+      "clouds": 6,
+      "nyan": 1
+    }
+  ]
 }
