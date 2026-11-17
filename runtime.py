@@ -36,7 +36,77 @@ class Juego:
     COLOR_ESTRELLA = '#FFD700'
     # Colores de la cola en el nivel Nyan Cat (se reparten con el operador %)
     ARCOIRIS = ['#FF0000', '#FF8C00', '#FFFF00', '#00FF00', '#00BFFF', '#8A2BE2']
+    def tanks_celda_libre(self, x, y, w=3, h=3):
+        if not (0 <= x <= self.ancho - w and 0 <= y <= self.alto - h):
+            return False
+        for dy in range(h):
+            for dx in range(w):
+                if self.grid[y + dy][x + dx] != 0:
+                    return False
+        return True
 
+    def tanks_crear_muros(self):
+        # Limpiamos primero por seguridad
+        for y in range(self.alto):
+            for x in range(self.ancho):
+                self.grid[y][x] = 0
+
+        # Coordenadas (x0, y0, ancho, alto, tipo) de bloques tácticos estilo arena clásica
+        # '#B22222' = Ladrillo destructible | '#A9A9A9' = Acero indestructible
+        bloques = [
+            # Pilares verticales superiores (ladrillo)
+            (5, 7, 2, 5, '#B22222'),   (12, 7, 2, 5, '#B22222'),
+            (22, 7, 2, 5, '#B22222'),  (29, 7, 2, 5, '#B22222'),
+
+            # Coberturas centrales (acero en los flancos, ladrillo destructible en el medio)
+            (4, 16, 3, 2, '#A9A9A9'),  (11, 16, 4, 2, '#B22222'),
+            (17, 16, 2, 2, '#A9A9A9'), # Núcleo central de acero
+            (21, 16, 4, 2, '#B22222'), (29, 16, 3, 2, '#A9A9A9'),
+
+            # Pilares inferiores (cobertura cerca del jugador)
+            (5, 23, 2, 5, '#B22222'),   (12, 23, 2, 5, '#B22222'),
+            (22, 23, 2, 5, '#B22222'),  (29, 23, 2, 5, '#B22222'),
+
+            # Pequeño búnker protector frente al spawn del jugador (ladrillo)
+            (15, 29, 6, 1, '#B22222'),
+            (15, 30, 1, 2, '#B22222'),
+            (20, 30, 1, 2, '#B22222'),
+        ]
+
+        for bx, by, bw, bh, color in bloques:
+            for dy in range(bh):
+                for dx in range(bw):
+                    if 0 <= by + dy < self.alto and 0 <= bx + dx < self.ancho:
+                        self.grid[by + dy][bx + dx] = color
+    def dibujar_martillo(self, x, y):
+        t = self.taman_celda
+        x0, y0 = x * t, y * t
+        # Mango vertical (marrón/amarillo oscuro)
+        self.canvas.create_rectangle(
+            x0 + t * 0.40, y0 + t * 0.35,
+            x0 + t * 0.60, y0 + t * 0.90,
+            fill='#D2691E', outline=''
+        )
+        # Cabeza del martillo horizontal (gris metálico / naranja)
+        self.canvas.create_rectangle(
+            x0 + t * 0.15, y0 + t * 0.12,
+            x0 + t * 0.85, y0 + t * 0.40,
+            fill='#FF8C00', outline='#FFFFFF'
+        )
+
+    def dibujar_escudo(self, x, y):
+        t = self.taman_celda
+        x0, y0 = x * t, y * t
+        # Silueta de escudo heráldico cyan dentro de 1 celda
+        puntos = [
+            x0 + t * 0.18, y0 + t * 0.15,
+            x0 + t * 0.82, y0 + t * 0.15,
+            x0 + t * 0.82, y0 + t * 0.55,
+            x0 + t * 0.50, y0 + t * 0.88,
+            x0 + t * 0.18, y0 + t * 0.55
+        ]
+        self.canvas.create_polygon(puntos, fill='#00FFFF', outline='#FFFFFF', width=1)
+    
     def __init__(self, datos_juego):
         self.datos_juego = datos_juego
         self.tipo_juego = self.datos_juego.get('tipo_juego', 'TETRIS')
@@ -74,7 +144,44 @@ class Juego:
 
         # Configurar eventos de teclado. Usamos <Key> para capturar cualquier tecla
         self.root.bind('<Key>', self.manejar_input_gui)
-        
+
+# --- NUEVAS VARIABLES PARA BRICK TANKS ---
+        if self.tipo_juego == 'TANKS':
+            # 1. Cámara alejada: grid amplio de 36x36 con celdas de 18px
+            self.taman_celda = 18
+            self.ancho = 36
+            self.alto = 36
+            self.grid = [[0 for _ in range(self.ancho)] for _ in range(self.alto)]
+            self.ancho_canvas = self.ancho * self.taman_celda
+            self.alto_canvas = self.alto * self.taman_celda
+            self.canvas.config(width=self.ancho_canvas, height=self.alto_canvas)    
+
+            self.velocidad_gravedad = 0.25   # Necesario para que el game_loop no falle
+            self.score = 0
+            
+            # Datos del Jugador (leemos HP del JSON si existe)
+            attrs_jugador = self.datos_juego.get('shape_attrs', {}).get('PLAYER_TANK', {})
+            self.player_hp = attrs_jugador.get('hp', 3)
+            self.player_x = self.ancho // 2
+            self.player_y = self.alto - 4
+            self.player_direction = 'UP'     # Hacia donde mira (para disparar)
+            
+            # Listas de entidades en pantalla
+            self.bullets = []                # {"x": X, "y": Y, "dir": DIR, "owner": "PLAYER"/"ENEMY"}
+            self.enemies = []                # Tanques enemigos activos
+            self.powerups_activos = []       # Martillos y escudos en el mapa
+            
+            # Estado del Final Boss
+            self.boss_active = False
+            self.boss_x = (self.ancho - 5) // 2
+            self.boss_y = 1
+            self.boss_dir = 1
+            attrs_boss = self.datos_juego.get('shape_attrs', {}).get('FINAL_BOSS', {})
+            self.boss_hp = attrs_boss.get('hp', 20)
+            
+            # Actualizamos el texto de controles en el panel lateral
+            self.label_controles.config(text="CONTROLES\nFlechas: Mover\nEspacio: Disparar")
+
         if self.tipo_juego == 'TETRIS':
             self.pieza_actual = None
             self.pieza_x, self.pieza_y, self.pieza_rotacion = 0, 0, 0
@@ -125,6 +232,8 @@ class Juego:
             # no pueden nacer encima de ella.
             self.aplicar_nivel(0)
         self.timer_id = None # Para controlar el loop de Tkinter
+        if self.tipo_juego == 'TANKS':
+            self.tanks_crear_muros()
 
     def run(self):
         # Inicia el ciclo principal de juego de Tkinter
@@ -149,6 +258,8 @@ class Juego:
         # para que la cuenta regresiva sea exacta sin importar la velocidad.
         if self.tipo_juego == 'SNAKE':
             self.snake_actualizar_estado()
+        elif self.tipo_juego == 'TANKS':
+            self.tanks_actualizar_estado()    
 
         self.dibujar()
 
@@ -184,11 +295,252 @@ class Juego:
                 # Atajo de prueba: salta directamente al nivel 1, 2 o 3
                 if int(key) - 1 < len(self.niveles):
                     self.aplicar_nivel(int(key) - 1)
+        def manejar_input_gui(self, event):
+            key = event.keysym.upper()
 
+        # Mapeo de teclas de flecha
+        if self.tipo_juego == 'TETRIS':
+            if key == 'UP': self.ejecutar_evento('ON_KEY_UP')
+            elif key == 'DOWN': self.ejecutar_evento('ON_KEY_DOWN')
+            elif key == 'LEFT': self.ejecutar_evento('ON_KEY_LEFT')
+            elif key == 'RIGHT': self.ejecutar_evento('ON_KEY_RIGHT')
+            
+        elif self.tipo_juego == 'SNAKE':
+            # Llamamos a las funciones internas para Snake
+            if key == 'UP': self.snake_cambiar_direccion('UP')
+            elif key == 'DOWN': self.snake_cambiar_direccion('DOWN')
+            elif key == 'LEFT': self.snake_cambiar_direccion('LEFT')
+            elif key == 'RIGHT': self.snake_cambiar_direccion('RIGHT')
+            elif key in ('1', '2', '3') and len(self.niveles) > 1:
+                # Atajo de prueba: salta directamente al nivel 1, 2 o 3
+                if int(key) - 1 < len(self.niveles):
+                    self.aplicar_nivel(int(key) - 1)
+                    
+        # --- NUEVO BLOQUE PARA TANKS ---
+        elif self.tipo_juego == 'TANKS':
+            if key == 'UP': self.tanks_mover_jugador(0, -1, 'UP')
+            elif key == 'DOWN': self.tanks_mover_jugador(0, 1, 'DOWN')
+            elif key == 'LEFT': self.tanks_mover_jugador(-1, 0, 'LEFT')
+            elif key == 'RIGHT': self.tanks_mover_jugador(1, 0, 'RIGHT')
+            elif key == 'SPACE': self.tanks_disparar_jugador()            
 
+    def tanks_mover_jugador(self, dx, dy, direccion):
+        # Si el jugador ya perdió (HP en 0), bloqueamos el movimiento
+        if getattr(self, 'player_hp', 0) <= 0:
+            return
+
+        # 1. Actualizamos hacia dónde está mirando el cañón del tanque
+        self.player_direction = direccion
+
+        # 2. Calculamos la futura posición
+        nueva_x = self.player_x + dx
+        nueva_y = self.player_y + dy
+
+        # 3. Validamos que no se salga de la pantalla.
+        # (Uso 30 porque en tu tanks.brick definiste GAME GRID (30, 30).
+        # Restamos 2 porque la matriz del tanque mide 3x3)
+        if self.tanks_celda_libre(nueva_x, nueva_y):
+            self.player_x = nueva_x
+            self.player_y = nueva_y
+
+        # Opcional: Si tienes una función para redibujar la pantalla al instante
+        # en tu código de Tetris/Snake, llámala aquí. Suele llamarse self.dibujar() 
+        # o self.actualizar_canvas(). Si no la tienes, el Game Loop lo hará solo.
+        if hasattr(self, 'dibujar'):
+            self.dibujar()
+
+    def tanks_disparar_jugador(self):
+        if getattr(self, 'player_hp', 0) <= 0:
+            return
+
+        # Que la bala salga justo de la punta del cañón (fuera de la matriz 3x3)
+        offsets = {
+            'UP':    (1, -1),
+            'DOWN':  (1, 3),
+            'LEFT':  (-1, 1),
+            'RIGHT': (3, 1)
+        }
+        dx, dy = offsets.get(self.player_direction, (1, -1))
+        bx = self.player_x + dx
+        by = self.player_y + dy
+
+        if 0 <= bx < self.ancho and 0 <= by < self.alto:
+            self.bullets.append({
+                "x": bx,
+                "y": by,
+                "dir": self.player_direction,
+                "owner": "PLAYER"
+            })
+
+    def tanks_actualizar_estado(self):
+        if self.juego_terminado:
+            return
+
+        # Inicializar contadores internos si no existen
+        if not hasattr(self, 'tanks_tick'):
+            self.tanks_tick = 0
+            self.shield_until = 0
+
+        self.tanks_tick += 1
+
+        # 1. MOVER BALAS (cada 2 frames = 20 celdas/seg, velocidad arcade ideal)
+        if self.tanks_tick % 2 == 0:
+            balas_activas = []
+            for bala in self.bullets:
+                if bala['dir'] == 'UP': bala['y'] -= 1
+                elif bala['dir'] == 'DOWN': bala['y'] += 1
+                elif bala['dir'] == 'LEFT': bala['x'] -= 1
+                elif bala['dir'] == 'RIGHT': bala['x'] += 1
+
+                if not (0 <= bala['x'] < self.ancho and 0 <= bala['y'] < self.alto):
+                    continue
+
+                # Colisión de la bala contra muros del mapa
+                celda_muro = self.grid[bala['y']][bala['x']]
+                if celda_muro != 0:
+                    if celda_muro == '#B22222':  # Ladrillo: se destruye
+                        self.grid[bala['y']][bala['x']] = 0
+                    # Tanto ladrillo como acero ('#A9A9A9') detienen la bala
+                    continue
+
+                impacto = False
+
+                # Bala del JUGADOR contra Enemigos y Boss
+                if bala['owner'] == 'PLAYER':
+                    for enemigo in self.enemies[:]:
+                        if enemigo['x'] <= bala['x'] < enemigo['x'] + 3 and enemigo['y'] <= bala['y'] < enemigo['y'] + 3:
+                            enemigo['hp'] -= 1
+                            impacto = True
+                            if enemigo['hp'] <= 0:
+                                self.puntuacion += enemigo['points']
+                                self.enemies.remove(enemigo)
+                            break
+
+                    if not impacto and self.boss_active and self.boss_hp > 0:
+                        if self.boss_x <= bala['x'] < self.boss_x + 5 and self.boss_y <= bala['y'] < self.boss_y + 3:
+                            self.boss_hp -= 1
+                            impacto = True
+                            if self.boss_hp <= 0:
+                                self.puntuacion += 500
+                                self.juego_terminado = True  # ¡Victoria!
+
+                # Bala ENEMIGA contra el Jugador
+                elif bala['owner'] == 'ENEMY':
+                    if self.player_x <= bala['x'] < self.player_x + 3 and self.player_y <= bala['y'] < self.player_y + 3:
+                        impacto = True
+                        if time.time() > self.shield_until:
+                            self.player_hp -= 1
+                            if self.player_hp <= 0:
+                                self.juego_terminado = True
+
+                if not impacto:
+                    balas_activas.append(bala)
+            self.bullets = balas_activas
+
+        # 2. RECOGER POWER-UPS (Martillo / Escudo)
+        for pu in self.powerups_activos[:]:
+            # Colisión de cajas (Jugador 3x3 vs Power-up 2x2)
+            if (abs(self.player_x - pu['x']) < 3 and abs(self.player_y - pu['y']) < 3):
+                info_pu = self.datos_juego.get('powerups', {}).get(pu['tipo'], {})
+                efecto = info_pu.get('efecto', pu['tipo']).upper()
+                if 'REPAIR' in efecto or 'MARTILLO' in efecto:
+                    self.player_hp = min(self.player_hp + 1, 5)
+                elif 'SHIELD' in efecto or 'ESCUDO' in efecto:
+                    self.shield_until = time.time() + 6.0  # 6 segundos de escudo
+                self.puntuacion += info_pu.get('puntos', 50)
+                self.powerups_activos.remove(pu)
+
+        # 3. APARICIÓN DE ENEMIGOS Y POWER-UPS (mientras no esté el Boss)
+        if not self.boss_active:
+            # Generar enemigos cada ~2 segundos (80 frames) si hay menos de 4
+            if self.tanks_tick % 80 == 0 and len(self.enemies) < 4:
+                attrs = self.datos_juego.get('shape_attrs', {})
+                candidatos = [k for k, v in attrs.items() if v.get('type') == 'ENEMY']
+                if candidatos:
+                    tipo_e = random.choice(candidatos)
+                    info_e = attrs[tipo_e]
+                    spawn_x = random.choice([2, 10, 18, 26, 31])  # Posibles posiciones de spawn
+                    if self.tanks_celda_libre(spawn_x, 1, 3, 3):
+                        self.enemies.append({
+                            'tipo': tipo_e,
+                            'x': spawn_x,
+                            'y': 1,
+                            'dir': 'DOWN',
+                            'hp': info_e.get('hp', 1),
+                            'points': info_e.get('points', 100)
+                        })
+
+            # Generar un Power-up aleatorio cada ~4 segundos (160 frames) en celda libre
+            if self.tanks_tick % 160 == 0 and len(self.powerups_activos) < 2:
+                pus = list(self.datos_juego.get('powerups', {}).keys()) or ['MARTILLO', 'ESCUDO']
+                for _ in range(15):
+                    px = random.randint(2, self.ancho - 4)
+                    py = random.randint(5, self.alto - 5)
+                    if self.tanks_celda_libre(px, py, 1, 1):
+                        self.powerups_activos.append({
+                            'tipo': random.choice(pus),
+                            'x': px,
+                            'y': py
+                        })
+                        break
+
+        # 4. IA DE MOVIMIENTO Y DISPARO ENEMIGO (cada 12 frames)
+        if self.tanks_tick % 12 == 0:
+            dirs = {'UP': (0, -1), 'DOWN': (0, 1), 'LEFT': (-1, 0), 'RIGHT': (1, 0)}
+            for e in self.enemies:
+                if random.random() < 0.25:
+                    e['dir'] = random.choice(['UP', 'DOWN', 'LEFT', 'RIGHT'])
+                dx, dy = dirs[e['dir']]
+                nx, ny = e['x'] + dx, e['y'] + dy
+                # Ahora valida bordes Y muros usando tanks_celda_libre
+                if self.tanks_celda_libre(nx, ny, 3, 3):
+                    e['x'], e['y'] = nx, ny
+                else:
+                    e['dir'] = random.choice(['UP', 'DOWN', 'LEFT', 'RIGHT'])
+
+                # Probabilidad de disparo enemigo
+                if random.random() < 0.15:
+                    self.bullets.append({
+                        'x': e['x'] + 1,
+                        'y': e['y'] + 1,
+                        'dir': e['dir'],
+                        'owner': 'ENEMY'
+                    })
+
+        # 5. TRANSICIÓN AL FINAL BOSS (1000 PUNTOS)
+        if self.puntuacion >= 1000 and not self.boss_active:
+            self.boss_active = True
+            self.enemies = []  # CLEAR_ENEMIES
+            # Destruir todos los muros del mapa para abrir la arena del Jefe Final
+            for y in range(self.alto):
+                for x in range(self.ancho):
+                    self.grid[y][x] = 0
+            self.boss_x = (self.ancho - 5) // 2
+            self.boss_y = 2
+
+        # 6. MOVIMIENTO Y ATAQUE DEL FINAL BOSS (estilo Galaga)
+        if self.boss_active and self.boss_hp > 0:
+            if self.tanks_tick % 6 == 0:
+                self.boss_x += self.boss_dir
+                if self.boss_x <= 0 or self.boss_x >= self.ancho - 5:
+                    self.boss_dir *= -1
+            if self.tanks_tick % 25 == 0:
+                # El jefe dispara hacia abajo desde su cañón central
+                self.bullets.append({
+                    'x': self.boss_x + 2,
+                    'y': self.boss_y + 3,
+                    'dir': 'DOWN',
+                    'owner': 'ENEMY'
+                })
+        
     def dibujar(self):
         self.canvas.delete("all") # Borrar todo en cada frame
-        self.label_score.config(text="PUNTUACION\n" + str(self.puntuacion))
+        texto_score = "PUNTUACION\n" + str(self.puntuacion)
+        if self.tipo_juego == 'TANKS':
+            texto_score += "\n\nVIDAS (HP): " + str(self.player_hp)
+            if getattr(self, 'boss_active', False):
+                texto_score += "\nBOSS HP: " + str(self.boss_hp)
+        self.label_score.config(text=texto_score)
         if self.tipo_juego == 'SNAKE' and self.label_nivel is not None:
             texto = "NIVEL\n" + str(self.niveles[self.nivel_idx].get('nombre', ''))
             if self.estado == 'INVULNERABLE':
@@ -253,6 +605,58 @@ class Juego:
                     else:
                         color = color_cuerpo
                     self.dibujar_forma(x, y, color, self.forma_serpiente)
+                    # 4. Dibujar Brick Tanks (Jugador, Enemigos, Balas, Power-ups y Boss)
+        if self.tipo_juego == 'TANKS':
+            # Mapeo de dirección a índice de rotación (STATE 1=UP, 2=RIGHT, 3=DOWN, 4=LEFT)
+            mapa_rot = {'UP': 0, 'RIGHT': 1, 'DOWN': 2, 'LEFT': 3}
+            shapes = self.datos_juego.get('shapes', {})
+            attrs = self.datos_juego.get('shape_attrs', {})
+
+            # A. Dibujar Tanque Jugador (brilla en cyan si tiene escudo activo)
+            if self.player_hp > 0 and 'PLAYER_TANK' in shapes:
+                estados_j = shapes['PLAYER_TANK']
+                idx_j = mapa_rot.get(self.player_direction, 0) % len(estados_j)
+                escudo_activo = time.time() < getattr(self, 'shield_until', 0)
+                color_j = '#00FFFF' if escudo_activo else attrs.get('PLAYER_TANK', {}).get('color', '#00FF00')
+                for dy, fila in enumerate(estados_j[idx_j]):
+                    for dx, celda in enumerate(fila):
+                        if celda == 1:
+                            self.dibujar_celda(self.player_x + dx, self.player_y + dy, color_j)
+
+            # B. Dibujar Tanques Enemigos
+            for enemigo in self.enemies:
+                nombre_e = enemigo['tipo']
+                if nombre_e in shapes:
+                    estados_e = shapes[nombre_e]
+                    idx_e = mapa_rot.get(enemigo.get('dir', 'DOWN'), 0) % len(estados_e)
+                    color_e = attrs.get(nombre_e, {}).get('color', '#FF0000')
+                    for dy, fila in enumerate(estados_e[idx_e]):
+                        for dx, celda in enumerate(fila):
+                            if celda == 1:
+                                self.dibujar_celda(enemigo['x'] + dx, enemigo['y'] + dy, color_e)
+
+            # C. Dibujar Final Boss (escala gigante 2x2 por cada bloque de su matriz)
+            if self.boss_active and self.boss_hp > 0 and 'FINAL_BOSS' in shapes:
+                matriz_boss = shapes['FINAL_BOSS'][0]
+                color_b = attrs.get('FINAL_BOSS', {}).get('color', '#800080')
+                for dy, fila in enumerate(matriz_boss):
+                    for dx, celda in enumerate(fila):
+                        if celda == 1:
+                            for sub_y in range(2):
+                                for sub_x in range(2):
+                                    self.dibujar_celda(self.boss_x + dx * 2 + sub_x, self.boss_y + dy * 2 + sub_y, color_b)
+
+            # D. Dibujar Power-ups en el mapa (1 celda cada uno con ícono vectorial)
+            for pu in self.powerups_activos:
+                nombre_pu = pu['tipo'].upper()
+                if 'MARTILLO' in nombre_pu or 'REPAIR' in nombre_pu:
+                    self.dibujar_martillo(pu['x'], pu['y'])
+                else:
+                    self.dibujar_escudo(pu['x'], pu['y'])
+            # E. Dibujar Balas
+            color_bala = attrs.get('BULLET', {}).get('color', '#FFFF00')
+            for bala in self.bullets:
+                self.dibujar_celda(bala['x'], bala['y'], color_bala)            
 
     def dibujar_celda(self, x, y, color):
         ts = self.taman_celda # Alias para taman de celda

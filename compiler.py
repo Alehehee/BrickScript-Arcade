@@ -35,7 +35,7 @@ def lexer(codigo_fuente):
     token_regex = (r'#[0-9A-Fa-f]{6}\b'          # un color: #33CC33
                    r'|\b[A-F0-9]{6}\b'           # color sin '#'
                    r'|\b[A-Z][A-Z0-9_]*\b'       # palabra clave/nombre: LEVELS, NYAN_CAT
-                   r'|\d+'                       # un numero entero: 150
+                   r'|\d+(?:\.\d+)?'                       # un numero entero: 150
                    r'|[\[\](),:]')               # simbolos sueltos: [ ] ( ) , :
     # findall devuelve TODOS los tokens en orden. Todo lo demas (espacios,
     # minusculas, simbolos raros) se ignora.
@@ -326,7 +326,25 @@ class Parser:
     # --- EVENTOS (sin cambios) -------------------------------------
     def parsear_evento(self):
         self.consumir('ON')
-        nombre_evento = 'ON_' + self.consumir()
+        tipo_evento = self.consumir()
+
+        # --- CASO NUEVO (TANKS): ON TARGET_SCORE 1000 ACCION OBJETO ---
+        if tipo_evento == 'TARGET_SCORE':
+            puntaje_meta = self.consumir()   # Ej: '1000'
+            nombre_evento = 'ON_TARGET_SCORE_' + puntaje_meta
+            verbo = self.consumir()          # Ej: 'EXECUTE' o 'SPAWN'
+            objeto = self.consumir()         # Ej: 'CLEAR_ENEMIES' o 'FINAL_BOSS'
+            
+            # Acumulamos en una lista para soportar multiples lineas con el mismo puntaje
+            self.ast['events'].setdefault(nombre_evento, []).append({
+                'accion': verbo,
+                'objeto': objeto,
+                'params': [int(puntaje_meta)]
+            })
+            return
+
+        # --- CASO CLASICO (TETRIS / SNAKE): ON <EVENTO>: ... END ---
+        nombre_evento = 'ON_' + tipo_evento
         self.consumir(':')
         acciones = []
         fin_accion = ['END', 'ON', 'DEFINE', 'SPAWN', 'MOVE', 'ROTATE',
