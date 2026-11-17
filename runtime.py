@@ -106,6 +106,57 @@ class Juego:
             x0 + t * 0.18, y0 + t * 0.55
         ]
         self.canvas.create_polygon(puntos, fill='#00FFFF', outline='#FFFFFF', width=1)
+
+    def dibujar_transicion_boss(self, paso):
+        # paso va de 1 a 60 (1.5 segundos en total a 25ms por frame)
+        # Fase 1 (1..20): La ola baja cubriendo la pantalla
+        # Fase 2 (21..42): Pantalla roja completa con calavera pixel-art y alerta
+        # Fase 3 (43..60): La ola termina de bajar despejando la arena limpia
+        if paso <= 20:
+            y_inicio = 0
+            y_fin = int((paso / 20.0) * self.alto)
+        elif paso <= 42:
+            y_inicio = 0
+            y_fin = self.alto
+        else:
+            y_inicio = int(((paso - 42) / 18.0) * self.alto)
+            y_fin = self.alto
+
+        # Dibujar el cuerpo de la ola roja
+        for y in range(y_inicio, y_fin):
+            color_fila = '#FF2222' if (y == y_fin - 1 and paso <= 20) else '#8B0000'
+            for x in range(self.ancho):
+                self.dibujar_celda(x, y, color_fila)
+
+        # Mostrar calavera pixel-art blanca en el centro durante la fase central
+        if 14 <= paso <= 46:
+            calavera = [
+                [0, 0, 1, 1, 1, 1, 1, 0, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 0],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 1, 0, 0, 1, 0, 0, 1, 1],
+                [1, 1, 0, 0, 1, 0, 0, 1, 1],
+                [1, 1, 1, 1, 0, 1, 1, 1, 1],
+                [0, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 0, 1, 0, 1, 0, 1, 0, 0],
+                [0, 0, 1, 0, 1, 0, 1, 0, 0],
+            ]
+            ox = (self.ancho - 9) // 2
+            oy = (self.alto - 9) // 2 - 2
+            for dy, fila in enumerate(calavera):
+                for dx, celda in enumerate(fila):
+                    if celda == 1 and y_inicio <= oy + dy < y_fin:
+                        self.dibujar_celda(ox + dx, oy + dy, '#FFFFFF')
+
+            # Texto retro parpadeante debajo de la calavera
+            if (paso // 4) % 2 == 0 and y_fin >= oy + 12:
+                self.canvas.create_text(
+                    self.ancho_canvas // 2,
+                    (oy + 12) * self.taman_celda,
+                    text="WARNING - FINAL BOSS",
+                    fill='#FFFFFF',
+                    font=('Consolas', 15, 'bold')
+                )
     
     def __init__(self, datos_juego):
         self.datos_juego = datos_juego
@@ -173,6 +224,7 @@ class Juego:
             
             # Estado del Final Boss
             self.boss_active = False
+            self.boss_intro_step = 0
             self.boss_x = (self.ancho - 5) // 2
             self.boss_y = 1
             self.boss_dir = 1
@@ -375,7 +427,15 @@ class Juego:
     def tanks_actualizar_estado(self):
         if self.juego_terminado:
             return
-
+        
+        # Si la animación de transición al Boss está en curso, avanzar solo la animación
+        if getattr(self, 'boss_intro_step', 0) > 0:
+            self.boss_intro_step += 1
+            if self.boss_intro_step > 60:
+                self.boss_intro_step = 0
+                self.boss_active = True
+            return
+        
         # Inicializar contadores internos si no existen
         if not hasattr(self, 'tanks_tick'):
             self.tanks_tick = 0
@@ -424,13 +484,15 @@ class Juego:
                                 self.puntuacion += 500
                                 self.juego_terminado = True  # ¡Victoria!
 
-                # Bala ENEMIGA contra el Jugador
-                elif bala['owner'] == 'ENEMY':
+                # Bala ENEMIGA o del BOSS contra el Jugador
+                elif bala['owner'] in ('ENEMY', 'BOSS'):
                     if self.player_x <= bala['x'] < self.player_x + 3 and self.player_y <= bala['y'] < self.player_y + 3:
                         impacto = True
                         if time.time() > self.shield_until:
-                            self.player_hp -= 1
+                            danio = 2 if bala['owner'] == 'BOSS' else 1
+                            self.player_hp -= danio
                             if self.player_hp <= 0:
+                                self.player_hp = 0
                                 self.juego_terminado = True
 
                 if not impacto:
@@ -508,15 +570,21 @@ class Juego:
                     })
 
         # 5. TRANSICIÓN AL FINAL BOSS (1000 PUNTOS)
-        if self.puntuacion >= 1000 and not self.boss_active:
-            self.boss_active = True
+        if self.puntuacion >= 1000 and not self.boss_active and getattr(self, 'boss_intro_step', 0) == 0:
+            self.boss_intro_step = 1
             self.enemies = []  # CLEAR_ENEMIES
-            # Destruir todos los muros del mapa para abrir la arena del Jefe Final
+            self.bullets = []  # Limpiar balas en vuelo para una entrada limpia
+            # Teletransportar al jugador al centro inferior mirando hacia arriba
+            self.player_x = (self.ancho - 3) // 2
+            self.player_y = self.alto - 4
+            self.player_direction = 'UP'
+            # Destruir todos los muros del mapa bajo la ola roja
             for y in range(self.alto):
                 for x in range(self.ancho):
                     self.grid[y][x] = 0
-            self.boss_x = (self.ancho - 5) // 2
+            self.boss_x = (self.ancho - 10) // 2
             self.boss_y = 2
+            return
 
         # 6. MOVIMIENTO Y ATAQUE DEL FINAL BOSS (estilo Galaga)
         if self.boss_active and self.boss_hp > 0:
@@ -530,7 +598,7 @@ class Juego:
                     'x': self.boss_x + 2,
                     'y': self.boss_y + 3,
                     'dir': 'DOWN',
-                    'owner': 'ENEMY'
+                    'owner': 'BOSS'
                 })
         
     def dibujar(self):
@@ -653,10 +721,15 @@ class Juego:
                     self.dibujar_martillo(pu['x'], pu['y'])
                 else:
                     self.dibujar_escudo(pu['x'], pu['y'])
-            # E. Dibujar Balas
+            # E. Dibujar Balas (amarillas normales, magenta/rojas las del Boss)
             color_bala = attrs.get('BULLET', {}).get('color', '#FFFF00')
             for bala in self.bullets:
-                self.dibujar_celda(bala['x'], bala['y'], color_bala)            
+                c = '#FF0055' if bala.get('owner') == 'BOSS' else color_bala
+                self.dibujar_celda(bala['x'], bala['y'], c)      
+
+            # F. Animación de transición al Final Boss (ola roja + calavera)
+            if getattr(self, 'boss_intro_step', 0) > 0:
+                self.dibujar_transicion_boss(self.boss_intro_step)
 
     def dibujar_celda(self, x, y, color):
         ts = self.taman_celda # Alias para taman de celda

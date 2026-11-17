@@ -345,7 +345,7 @@
       "speed": 100
     }, 
     "ENEMY_NORMAL": {
-      "color": "#FF0000", 
+      "color": "#FF1493", 
       "type": "ENEMY", 
       "hp": 2, 
       "chance": 0.5, 

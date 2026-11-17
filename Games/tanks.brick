@@ -44,7 +44,7 @@ END SHAPE
 # LOS ENEMIGOS (Con puntaje por matarlos)
     DEFINE SHAPE ENEMY_NORMAL
     TYPE: ENEMY
-    COLOR: #FF0000
+    COLOR: #FF1493
     HP: 2
     BEHAVIOR: WANDER # Significa que se mueve al azar por el mapa
     SPEED: 150
